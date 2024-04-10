@@ -7,89 +7,83 @@
 #include <map>
 #include <syncstream>
 #include <algorithm>
-#include <vector>
 
 using namespace std::chrono_literals;
 
-struct Employee {
+struct Employee
+{
     std::map<std::string, uint64_t> lunch_partners_counter;
     std::string id;
-    std::mutex m;
+    std::timed_mutex m;
 
-    Employee(std::string id) : id(std::move(id)) {}
+    Employee(std::string id) : id(id) {}
 
-    std::string partners() const {
+    std::string partners() const
+    {
         std::string ret = "Employee " + id + " has lunch partners: ";
-        for (auto [partner, count] : lunch_partners_counter) {
-            ret += partner + " (" + std::to_string(count) + "), ";
-        }
-        if (!lunch_partners_counter.empty()) {
-            ret.pop_back(); // Remove the last space and comma
-            ret.pop_back();
-        }
+        for (int count{}; const auto& partner : lunch_partners_counter)
+        ret += (count++ ? ", " : "") + partner.first + " (" + std::to_string(partner.second) + ')';
         return ret;
     }
 };
 
-void send_mail(Employee&, Employee&) {
-    std::this_thread::sleep_for(100ms);
-}
-
-void print_progress(const std::string& msg, const std::vector<std::reference_wrapper<Employee>>& employees) {
-    std::stringstream ss;
-    for (auto& emp : employees) {
-        ss << emp.get().id << " ";
-    }
-    ss << msg << std::endl;
-    std::cout << ss.str();
-}
-
-void assign_lunch_partners(Employee& employee1, Employee& employee2, Employee& employee3) {
+void assign_lunch_partners_deadlock_timed(Employee& first, Employee& second, Employee& third)
+{
     // Print waiting message for all partners.
-    print_progress("are waiting for locks.", employees);
+    std::osyncstream(std::cout) << first.id << " and " << second.id << " and " << third.id << " are waiting for locks.\n";
 
-    std::vector<std::unique_lock<std::mutex>> locks;
-    for (auto& emp : employees) {
-        locks.emplace_back(emp.get().m, std::defer_lock);
+    // Lock all mutexes at once to avoid deadlock.
+    while(!(first.m.try_lock_for(100ms) && second.m.try_lock_for(100ms) && third.m.try_lock_for(100ms)))
+    {
+
     }
-    std::lock(locks.begin(), locks.end());
+//    first.m.lock();
+//    second.m.lock();
+//    third.m.lock();
 
     // Print got locks message for all partners.
-    print_progress("got locks.", employees);
+    std::osyncstream(std::cout) << first.id << " and " << second.id << " and " << third.id << " got locks.\n";
 
     // Update the lunch counters for each pair of employees.
-    for (size_t i = 0; i < employees.size(); ++i) {
-        for (size_t j = i + 1; j < employees.size(); ++j) {
-            Employee& first = employees[i];
-            Employee& second = employees[j];
+    ++first.lunch_partners_counter[second.id];
+    ++first.lunch_partners_counter[third.id];
+    ++second.lunch_partners_counter[first.id];
+    ++second.lunch_partners_counter[third.id];
+    ++third.lunch_partners_counter[first.id];
+    ++third.lunch_partners_counter[second.id];
 
-            ++first.lunch_partners_counter[second.id];
-            ++second.lunch_partners_counter[first.id];
-        }
-    }
+    // Wait a while
+    std::this_thread::sleep_for(100ms);
 
     // Messages after releasing the locks
-    print_progress("have released their locks.", employees);
+    std::osyncstream(std::cout) << first.id << " and " << second.id << " and " << third.id << " have released their locks.\n";
 }
 
-int main() {
+int main()
+{
     std::map<int, Employee> employees;
 
     employees.emplace(0, "A");
     employees.emplace(1, "B");
     employees.emplace(2, "C");
-    employees.emplace(3, "D");
 
-    std::vector<std::reference_wrapper<Employee>> emp_refs;
-    for (auto& [_, emp] : employees) {
-        emp_refs.push_back(emp);
+    {
+        std::vector<std::jthread> threads;
+        std::vector<int> set = {0, 1, 2};
+        std::sort(set.begin(), set.end());
+
+        do {
+//            threads.emplace_back([set, &employees](){
+//                assign_lunch_partners(employees.at(set[0]), employees.at(set[1]),
+//                                      employees.at(set[2]));});
+            threads.emplace_back([set, &employees](){
+                assign_lunch_partners_deadlock_timed(employees.at(set[0]), employees.at(set[1]),
+                                               employees.at(set[2]));});
+        } while (std::next_permutation(set.begin(), set.end()));
     }
 
-    // Here you can use assign_lunch_partners with emp_refs directly
-    // For example:
-    assign_lunch_partners(emp_refs);
-
-    for (auto& [_, employee] : employees) {
-        std::cout << employee.partners() << '\n';
+    for(auto &employee : employees)
+    {
+        std::cout << employee.second.partners() << '\n';
     }
 }

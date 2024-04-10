@@ -1,12 +1,10 @@
 #include <atomic>
 #include <chrono>
-#include <cstddef>
 #include <iostream>
 #include <mutex>
 #include <new>
 #include <thread>
 #include <syncstream>
-
 
 #ifdef __cpp_lib_hardware_interference_size
 using std::hardware_constructive_interference_size;
@@ -17,17 +15,15 @@ using std::hardware_destructive_interference_size;
     constexpr std::size_t hardware_destructive_interference_size = 64;
 #endif
 
-
 constexpr int max_write_iterations{10'000'000}; // the benchmark time tuning
 
-struct alignas(hardware_constructive_interference_size)
-OneCacheLiner // occupies one cache line
+struct alignas(hardware_constructive_interference_size) OneCacheLiner
 {
     std::atomic_uint64_t x{};
     std::atomic_uint64_t y{};
 } oneCacheLiner;
 
-struct TwoCacheLiner // occupies two cache lines
+struct TwoCacheLiner
 {
     alignas(hardware_destructive_interference_size) std::atomic_uint64_t x{};
     alignas(hardware_destructive_interference_size) std::atomic_uint64_t y{};

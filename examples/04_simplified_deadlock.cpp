@@ -29,16 +29,16 @@ struct Employee
 
 void assign_lunch_partners(Employee& first, Employee& second, Employee& third)
 {
-    // Print waiting message for all partners.
+    // Print waiting message for all partners
     std::osyncstream(std::cout) << first.id << " and " << second.id << " and " << third.id << " are waiting for locks.\n";
 
-    // Lock all mutexes at once to avoid deadlock.
+    // Lock all mutexes at once to avoid deadlock
     std::scoped_lock lock(first.m, second.m, third.m);
 
-    // Print got locks message for all partners.
+    // Print got locks message for all partners
     std::osyncstream(std::cout) << first.id << " and " << second.id << " and " << third.id << " got locks.\n";
 
-    // Update the lunch counters for each pair of employees.
+    // Update the lunch counters for each pair of employees
     ++first.lunch_partners_counter[second.id];
     ++first.lunch_partners_counter[third.id];
     ++second.lunch_partners_counter[first.id];
@@ -55,18 +55,18 @@ void assign_lunch_partners(Employee& first, Employee& second, Employee& third)
 
 void assign_lunch_partners_deadlock(Employee& first, Employee& second, Employee& third)
 {
-    // Print waiting message for all partners.
+    // Print waiting message for all partners
     std::osyncstream(std::cout) << first.id << " and " << second.id << " and " << third.id << " are waiting for locks.\n";
 
-    // Lock all mutexes at once to avoid deadlock.
+    // Lock all mutexes but deadlock can occur
     first.m.lock();
     second.m.lock();
     third.m.lock();
 
-    // Print got locks message for all partners.
+    // Print got locks message for all partners
     std::osyncstream(std::cout) << first.id << " and " << second.id << " and " << third.id << " got locks.\n";
 
-    // Update the lunch counters for each pair of employees.
+    // Update the lunch counters for each pair of employees
     ++first.lunch_partners_counter[second.id];
     ++first.lunch_partners_counter[third.id];
     ++second.lunch_partners_counter[first.id];
